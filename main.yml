@@ -1,0 +1,293 @@
+# #============= Contact centre for outbound calls ======================
+# AWSTemplateFormatVersion: '2010-09-09'
+# Description: Amazon Connect setup — inbound + outbound with user and queue setup
+
+# Parameters:
+#   InstanceAlias:
+#     Type: String
+#     Default: MyConnectInstanceABC01
+#     Description: Unique alias for Amazon Connect instance
+#   AgentPassword:
+#     Type: String
+#     NoEcho: true
+#     Description: Initial CCP agent password
+
+# Resources:
+#   ConnectInstance:
+#     Type: AWS::Connect::Instance
+#     Properties:
+#       IdentityManagementType: CONNECT_MANAGED
+#       InstanceAlias: !Ref InstanceAlias
+#       Attributes:
+#         InboundCalls: true
+#         OutboundCalls: true
+
+#   HoursOfOperation:
+#     Type: AWS::Connect::HoursOfOperation
+#     Properties:
+#       Name: DefaultHours
+#       Description: Business hours (UTC)
+#       InstanceArn: !GetAtt ConnectInstance.Arn
+#       TimeZone: UTC
+#       Config:
+#         - Day: SUNDAY
+#           StartTime: { Hours: 10, Minutes: 0 }
+#           EndTime: { Hours: 18, Minutes: 0 }
+
+#   PhoneNumber:
+#     Type: AWS::Connect::PhoneNumber
+#     Properties:
+#       TargetArn: !GetAtt ConnectInstance.Arn
+#       Type: DID
+#       CountryCode: US
+#       Description: Main contact line
+
+#   InboundFlow:
+#     Type: AWS::Connect::ContactFlow
+#     Properties:
+#       InstanceArn: !GetAtt ConnectInstance.Arn
+#       Name: BasicInboundFlow
+#       Type: CONTACT_FLOW
+#       Content: |
+#         {
+#           "Version": "2019-10-30",
+#           "StartAction": "entry-point",
+#           "Actions": [
+#             {
+#               "Identifier": "entry-point",
+#               "Type": "MessageParticipant",
+#               "Parameters": {
+#                 "Text": "Thank you for calling. Goodbye.",
+#                 "TextType": "PlainText"
+#               },
+#               "Transitions": {
+#                 "NextAction": "disconnect"
+#               }
+#             },
+#             {
+#               "Identifier": "disconnect",
+#               "Type": "Disconnect",
+#               "Parameters": {},
+#               "Transitions": {}
+#             }
+#           ]
+#         }
+
+#   OutboundFlow:
+#     Type: AWS::Connect::ContactFlow
+#     Properties:
+#       InstanceArn: !GetAtt ConnectInstance.Arn
+#       Name: BasicOutboundFlow
+#       Type: OUTBOUND_WHISPER
+#       Content: |
+#         {
+#           "Version": "2019-10-30",
+#           "StartAction": "entry",
+#           "Actions": [
+#             {
+#               "Identifier": "entry",
+#               "Type": "MessageParticipant",
+#               "Parameters": {
+#                 "Text": "This is an outbound call from our contact center.",
+#                 "TextType": "PlainText"
+#               },
+#               "Transitions": {
+#                 "NextAction": "disconnect"
+#               }
+#             },
+#             {
+#               "Identifier": "disconnect",
+#               "Type": "Disconnect",
+#               "Parameters": {},
+#               "Transitions": {}
+#             }
+#           ]
+#         }
+
+#   InboundQueue:
+#     Type: AWS::Connect::Queue
+#     Properties:
+#       InstanceArn: !GetAtt ConnectInstance.Arn
+#       Name: InboundQueue
+#       HoursOfOperationArn: !Ref HoursOfOperation
+
+#   OutboundQueue:
+#     Type: AWS::Connect::Queue
+#     Properties:
+#       InstanceArn: !GetAtt ConnectInstance.Arn
+#       Name: OutboundQueue
+#       HoursOfOperationArn: !Ref HoursOfOperation
+#       OutboundCallerConfig:
+#         OutboundCallerIdName: MyConnect
+#         OutboundCallerIdNumberArn: !Ref PhoneNumber
+#         OutboundFlowArn: !GetAtt OutboundFlow.ContactFlowArn
+
+#   RoutingProfile:
+#     Type: AWS::Connect::RoutingProfile
+#     Properties:
+#       InstanceArn: !GetAtt ConnectInstance.Arn
+#       Name: AgentRouting
+#       Description: In/Outbound routing
+#       DefaultOutboundQueueArn: !GetAtt OutboundQueue.QueueArn
+#       MediaConcurrencies:
+#         - Channel: VOICE
+#           Concurrency: 1
+#       QueueConfigs:
+#         - QueueReference:
+#             QueueArn: !GetAtt InboundQueue.QueueArn
+#           Priority: 1
+#           Delay: 0
+#         - QueueReference:
+#             QueueArn: !GetAtt OutboundQueue.QueueArn
+#           Priority: 2
+#           Delay: 0
+
+#   AgentSecurityProfile:
+#     Type: AWS::Connect::SecurityProfile
+#     Properties:
+#       InstanceArn: !GetAtt ConnectInstance.Arn
+#       SecurityProfileName: AgentSecurity
+#       Description: Basic profile for agents
+
+#   AgentUser:
+#     Type: AWS::Connect::User
+#     Properties:
+#       InstanceArn: !GetAtt ConnectInstance.Arn
+#       Username: agent1
+#       Password: !Ref AgentPassword
+#       IdentityInfo:
+#         FirstName: Jane
+#         LastName: Doe
+#         Email: jane.doe@example.com
+#       PhoneConfig:
+#         PhoneType: SOFT_PHONE
+#         AutoAccept: true
+#         AfterContactWorkTimeLimit: 300
+#       RoutingProfileArn: !GetAtt RoutingProfile.Arn
+#       SecurityProfileArns:
+#         - !Ref AgentSecurityProfile
+
+# Outputs:
+#   ConnectLoginURL:
+#     Description: "Agent CCP login URL"
+#     Value: !Sub "https://${InstanceAlias}.awsapps.com/connect/ccp-v2/"
+
+# #=====================================================================================
+
+AWSTemplateFormatVersion: '2010-09-09' 
+Description: Amazon Connect setup — instance, queues, routing, and agent (manual phone number)
+
+Parameters:
+  InstanceAlias:
+    Type: String
+    # Default: MyConnectInstanceABC01
+    Description: Unique alias for Amazon Connect instance
+
+  AgentPassword:
+    Type: String
+    NoEcho: true
+    Description: Initial password for Connect agent login
+
+Resources:
+
+  ConnectInstance:
+    Type: AWS::Connect::Instance
+    Properties:
+      IdentityManagementType: CONNECT_MANAGED
+      InstanceAlias: !Ref InstanceAlias
+      Attributes:
+        InboundCalls: true
+        OutboundCalls: true
+
+  HoursOfOperation:
+    Type: AWS::Connect::HoursOfOperation
+    Properties:
+      Name: DefaultHours
+      Description: Business hours (UTC)
+      InstanceArn: !GetAtt ConnectInstance.Arn
+      TimeZone: UTC
+      Config:
+        - Day: MONDAY
+          StartTime: { Hours: 10, Minutes: 0 }
+          EndTime: { Hours: 18, Minutes: 0 }
+        - Day: TUESDAY
+          StartTime: { Hours: 10, Minutes: 0 }
+          EndTime: { Hours: 18, Minutes: 0 }
+        - Day: WEDNESDAY
+          StartTime: { Hours: 10, Minutes: 0 }
+          EndTime: { Hours: 18, Minutes: 0 }
+        - Day: THURSDAY
+          StartTime: { Hours: 10, Minutes: 0 }
+          EndTime: { Hours: 18, Minutes: 0 }
+        - Day: FRIDAY
+          StartTime: { Hours: 10, Minutes: 0 }
+          EndTime: { Hours: 18, Minutes: 0 }
+
+  InboundQueue:
+    Type: AWS::Connect::Queue
+    Properties:
+      InstanceArn: !GetAtt ConnectInstance.Arn
+      Name: InboundQueue
+      HoursOfOperationArn: !Ref HoursOfOperation
+
+  OutboundQueue:
+    Type: AWS::Connect::Queue
+    Properties:
+      InstanceArn: !GetAtt ConnectInstance.Arn
+      Name: OutboundQueue
+      HoursOfOperationArn: !Ref HoursOfOperation
+      OutboundCallerConfig:
+        OutboundCallerIdName: MyConnect
+        # OutboundCallerIdNumberArn and OutboundFlowArn will be assigned manually in the console
+
+  RoutingProfile:
+    Type: AWS::Connect::RoutingProfile
+    Properties:
+      InstanceArn: !GetAtt ConnectInstance.Arn
+      Name: AgentRouting
+      Description: In/Outbound routing
+      DefaultOutboundQueueArn: !GetAtt OutboundQueue.QueueArn
+      MediaConcurrencies:
+        - Channel: VOICE
+          Concurrency: 1
+      QueueConfigs:
+        - QueueReference:
+            QueueArn: !GetAtt InboundQueue.QueueArn
+            Channel: VOICE
+          Priority: 1
+          Delay: 0
+        - QueueReference:
+            QueueArn: !GetAtt OutboundQueue.QueueArn
+            Channel: VOICE
+          Priority: 2
+          Delay: 0
+
+  AgentSecurityProfile:
+    Type: AWS::Connect::SecurityProfile
+    Properties:
+      InstanceArn: !GetAtt ConnectInstance.Arn
+      SecurityProfileName: AgentSecurity
+      Description: Basic profile for agents
+
+  AgentUser:
+    Type: AWS::Connect::User
+    Properties:
+      InstanceArn: !GetAtt ConnectInstance.Arn
+      Username: agent1
+      Password: !Ref AgentPassword
+      IdentityInfo:
+        FirstName: Jane
+        LastName: Doe
+        Email: jane.doe@example.com
+      PhoneConfig:
+        PhoneType: SOFT_PHONE
+        AutoAccept: true
+        AfterContactWorkTimeLimit: 300
+      RoutingProfileArn: !Ref RoutingProfile
+      SecurityProfileArns:
+        - !Ref AgentSecurityProfile
+
+Outputs:
+  ConnectLoginURL:
+    Description: "Agent CCP login URL"
+    Value: !Sub "https://${InstanceAlias}.awsapps.com/connect/ccp-v2/"
