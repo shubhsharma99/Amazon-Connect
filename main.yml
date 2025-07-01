@@ -63,14 +63,14 @@ Resources:
       Name: TechSupportQueue
       HoursOfOperationArn: !Ref HoursOfOperation
 
-  # OutboundQueue:
-  #   Type: AWS::Connect::Queue
-  #   Properties:
-  #     InstanceArn: !GetAtt ConnectInstance.Arn
-  #     Name: OutboundQueue
-  #     HoursOfOperationArn: !Ref HoursOfOperation
-  #     OutboundCallerConfig:
-  #       OutboundCallerIdName: !Ref OutboundCallerIdName
+  OutboundQueue:
+    Type: AWS::Connect::Queue
+    Properties:
+      InstanceArn: !GetAtt ConnectInstance.Arn
+      Name: OutboundQueue
+      HoursOfOperationArn: !Ref HoursOfOperation
+      OutboundCallerConfig:
+        OutboundCallerIdName: !Ref OutboundCallerIdName
 
   SalesRoutingProfile:
     Type: AWS::Connect::RoutingProfile
