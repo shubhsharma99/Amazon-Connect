@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Amazon Connect setup with Sales, TechSupport, Monitor agents and Lambda integration
+Description: Amazon Connect setup
 
 Parameters:
   InstanceAlias:
@@ -116,6 +116,7 @@ Resources:
           Priority: 2
           Delay: 0
 
+  # Security profiles
   SalesSecurityProfile:
     Type: AWS::Connect::SecurityProfile
     Properties:
@@ -137,6 +138,7 @@ Resources:
       SecurityProfileName: MonitorAgentProfile
       Description: Security profile for Monitoring agent
 
+  # Agent users
   SalesAgentUser:
     Type: AWS::Connect::User
     Properties:
@@ -191,58 +193,6 @@ Resources:
       SecurityProfileArns:
         - !GetAtt MonitorSecurityProfile.SecurityProfileArn
 
-  # === Lambda Role for Connect ===
-  ConnectLambdaExecutionRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: ConnectLambdaExecutionRole
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: lambda.amazonaws.com
-            Action: sts:AssumeRole
-      Policies:
-        - PolicyName: LambdaBasicExecutionPolicy
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: Allow
-                Action:
-                  - logs:CreateLogGroup
-                  - logs:CreateLogStream
-                  - logs:PutLogEvents
-                Resource: "*"
-              - Effect: Allow
-                Action:
-                  - connect:*
-                Resource: "*"
-
-  # === Lambda Function ===
-  RetrieveDataLambda:
-    Type: AWS::Lambda::Function
-    Properties:
-      FunctionName: RetrieveDataLambda
-      Runtime: python3.12
-      Handler: index.lambda_handler
-      Role: !GetAtt ConnectLambdaExecutionRole.Arn
-      Code:
-        ZipFile: |
-          def lambda_handler(event, context):
-              return {
-                  "statusCode": 200,
-                  "body": "Hello from Connect Lambda"
-              }
-
-  # === Permission for Connect to invoke Lambda ===
-  LambdaInvokePermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      FunctionName: !Ref RetrieveDataLambda
-      Action: lambda:InvokeFunction
-      Principal: connect.amazonaws.com
-
 Outputs:
   ConnectLoginURL:
     Description: Connect CCP login URL
@@ -250,21 +200,20 @@ Outputs:
 
 
 
-# AWSTemplateFormatVersion: '2010-09-09'
-# Description: Amazon Connect setup with Sales, TechSupport, Monitor agents
+
+# AWSTemplateFormatVersion: '2010-09-09' 
+# Description: Amazon Connect setup
 
 # Parameters:
 #   InstanceAlias:
 #     Type: String
-#     Description: Unique alias for Connect instance
+#     # Default: MyConnectInstanceABC01
+#     Description: Unique alias for Amazon Connect instance
+
 #   AgentPassword:
 #     Type: String
 #     NoEcho: true
-#     Description: Initial password for all Connect agents
-#   OutboundCallerIdName:
-#     Type: String
-#     Default: MyConnect
-#     Description: Outbound Caller ID name for outbound queue
+#     Description: Initial password for Connect agent login
 
 # Resources:
 
@@ -280,63 +229,57 @@ Outputs:
 #   HoursOfOperation:
 #     Type: AWS::Connect::HoursOfOperation
 #     Properties:
-#       Name: DefaultBusinessHours
-#       Description: "Business hours (UTC Mon–Fri, 10–18)"
+#       Name: DefaultHours
+#       Description: Business hours (UTC)
 #       InstanceArn: !GetAtt ConnectInstance.Arn
 #       TimeZone: UTC
 #       Config:
 #         - Day: MONDAY
 #           StartTime: { Hours: 10, Minutes: 0 }
-#           EndTime:   { Hours: 18, Minutes: 0 }
+#           EndTime: { Hours: 18, Minutes: 0 }
 #         - Day: TUESDAY
 #           StartTime: { Hours: 10, Minutes: 0 }
-#           EndTime:   { Hours: 18, Minutes: 0 }
+#           EndTime: { Hours: 18, Minutes: 0 }
 #         - Day: WEDNESDAY
 #           StartTime: { Hours: 10, Minutes: 0 }
-#           EndTime:   { Hours: 18, Minutes: 0 }
+#           EndTime: { Hours: 18, Minutes: 0 }
 #         - Day: THURSDAY
 #           StartTime: { Hours: 10, Minutes: 0 }
-#           EndTime:   { Hours: 18, Minutes: 0 }
+#           EndTime: { Hours: 18, Minutes: 0 }
 #         - Day: FRIDAY
 #           StartTime: { Hours: 10, Minutes: 0 }
-#           EndTime:   { Hours: 18, Minutes: 0 }
+#           EndTime: { Hours: 18, Minutes: 0 }
 
-#   SalesQueue:
+#   InboundQueue:
 #     Type: AWS::Connect::Queue
 #     Properties:
 #       InstanceArn: !GetAtt ConnectInstance.Arn
-#       Name: SalesQueue
+#       Name: InboundQueue
 #       HoursOfOperationArn: !Ref HoursOfOperation
 
-#   TechQueue:
+#   OutboundQueue:
 #     Type: AWS::Connect::Queue
 #     Properties:
 #       InstanceArn: !GetAtt ConnectInstance.Arn
-#       Name: TechSupportQueue
+#       Name: OutboundQueue
 #       HoursOfOperationArn: !Ref HoursOfOperation
+#       OutboundCallerConfig:
+#         OutboundCallerIdName: MyConnect
+#         # OutboundCallerIdNumberArn and OutboundFlowArn will be assigned manually in the console
 
-#   # OutboundQueue:
-#   #   Type: AWS::Connect::Queue
-#   #   Properties:
-#   #     InstanceArn: !GetAtt ConnectInstance.Arn
-#   #     Name: OutboundQueue
-#   #     HoursOfOperationArn: !Ref HoursOfOperation
-#   #     OutboundCallerConfig:
-#   #       OutboundCallerIdName: !Ref OutboundCallerIdName
-
-#   SalesRoutingProfile:
+#   RoutingProfile:
 #     Type: AWS::Connect::RoutingProfile
 #     Properties:
 #       InstanceArn: !GetAtt ConnectInstance.Arn
-#       Name: SalesProfile
-#       Description: Routing for Sales agents
+#       Name: AgentRouting
+#       Description: In/Outbound routing
 #       DefaultOutboundQueueArn: !GetAtt OutboundQueue.QueueArn
 #       MediaConcurrencies:
 #         - Channel: VOICE
 #           Concurrency: 1
 #       QueueConfigs:
 #         - QueueReference:
-#             QueueArn: !GetAtt SalesQueue.QueueArn
+#             QueueArn: !GetAtt InboundQueue.QueueArn
 #             Channel: VOICE
 #           Priority: 1
 #           Delay: 0
@@ -346,108 +289,42 @@ Outputs:
 #           Priority: 2
 #           Delay: 0
 
-#   TechRoutingProfile:
-#     Type: AWS::Connect::RoutingProfile
-#     Properties:
-#       InstanceArn: !GetAtt ConnectInstance.Arn
-#       Name: TechSupportProfile
-#       Description: Routing for Tech Support agents
-#       DefaultOutboundQueueArn: !GetAtt OutboundQueue.QueueArn
-#       MediaConcurrencies:
-#         - Channel: VOICE
-#           Concurrency: 1
-#       QueueConfigs:
-#         - QueueReference:
-#             QueueArn: !GetAtt TechQueue.QueueArn
-#             Channel: VOICE
-#           Priority: 1
-#           Delay: 0
-#         - QueueReference:
-#             QueueArn: !GetAtt OutboundQueue.QueueArn
-#             Channel: VOICE
-#           Priority: 2
-#           Delay: 0
-
-#   # Security profiles
-#   SalesSecurityProfile:
+#   AgentSecurityProfile:
 #     Type: AWS::Connect::SecurityProfile
 #     Properties:
 #       InstanceArn: !GetAtt ConnectInstance.Arn
-#       SecurityProfileName: SalesAgentProfile
-#       Description: Security profile for Sales agents
+#       SecurityProfileName: AgentSecurity
+#       Description: Basic profile for agents
 
-#   TechSecurityProfile:
-#     Type: AWS::Connect::SecurityProfile
-#     Properties:
-#       InstanceArn: !GetAtt ConnectInstance.Arn
-#       SecurityProfileName: TechAgentProfile
-#       Description: Security profile for Tech agents
-
-#   MonitorSecurityProfile:
-#     Type: AWS::Connect::SecurityProfile
-#     Properties:
-#       InstanceArn: !GetAtt ConnectInstance.Arn
-#       SecurityProfileName: MonitorAgentProfile
-#       Description: Security profile for Monitoring agent
-
-#   # Agent users
-#   SalesAgentUser:
+#   AgentUser:
 #     Type: AWS::Connect::User
 #     Properties:
 #       InstanceArn: !GetAtt ConnectInstance.Arn
-#       Username: sales.agent1
+#       Username: agent1
 #       Password: !Ref AgentPassword
 #       IdentityInfo:
-#         FirstName: John
-#         LastName: Smith
-#         Email: john.smith@example.com
+#         FirstName: Jane
+#         LastName: Doe
+#         Email: jane.doe@example.com
 #       PhoneConfig:
 #         PhoneType: SOFT_PHONE
 #         AutoAccept: true
 #         AfterContactWorkTimeLimit: 300
-#       RoutingProfileArn: !GetAtt SalesRoutingProfile.RoutingProfileArn
-#       SecurityProfileArns: 
-#         - !GetAtt SalesSecurityProfile.SecurityProfileArn
-
-#   TechAgentUser:
-#     Type: AWS::Connect::User
-#     Properties:
-#       InstanceArn: !GetAtt ConnectInstance.Arn
-#       Username: tech.agent1
-#       Password: !Ref AgentPassword
-#       IdentityInfo:
-#         FirstName: Alice
-#         LastName: Kumar
-#         Email: alice.kumar@example.com
-#       PhoneConfig:
-#         PhoneType: SOFT_PHONE
-#         AutoAccept: true
-#         AfterContactWorkTimeLimit: 300
-#       RoutingProfileArn: !GetAtt TechRoutingProfile.RoutingProfileArn
+#       RoutingProfileArn: !Ref RoutingProfile
 #       SecurityProfileArns:
-#         - !GetAtt TechSecurityProfile.SecurityProfileArn
-
-#   MonitorAgentUser:
-#     Type: AWS::Connect::User
-#     Properties:
-#       InstanceArn: !GetAtt ConnectInstance.Arn
-#       Username: monitor.agent1
-#       Password: !Ref AgentPassword
-#       IdentityInfo:
-#         FirstName: Monitor
-#         LastName: Agent
-#         Email: monitor.agent1@example.com
-#       PhoneConfig:
-#         PhoneType: SOFT_PHONE
-#         AutoAccept: true
-#         AfterContactWorkTimeLimit: 300
-#       RoutingProfileArn: !GetAtt TechRoutingProfile.RoutingProfileArn
-#       SecurityProfileArns:
-#         - !GetAtt MonitorSecurityProfile.SecurityProfileArn
+#         - !Ref AgentSecurityProfile
 
 # Outputs:
 #   ConnectLoginURL:
-#     Description: Connect CCP login URL
+#     Description: "Agent CCP login URL"
 #     Value: !Sub "https://${InstanceAlias}.awsapps.com/connect/ccp-v2/"
+
+
+
+
+
+
+
+
 
 
